@@ -1,0 +1,8 @@
+<?php
+return array(
+	'host' => 'localhost',
+	'port' => '',
+	'user' => 'db-root-user',
+	'pass' => 'db-root-pass',
+	'database' => 'db-name'
+);
