@@ -56,7 +56,7 @@ $archive = new TableArchiver(
 	$database,
 	$mysql_user,
 	$data_dir,
-	ARCHIVE_FLAGS_LOG_STDOUT | ARCHIVE_FLAGS_DELETE_DATA,
+	ARCHIVE_FLAGS_LOG_STDOUT /* | ARCHIVE_FLAGS_DELETE_DATA */,
 	$log_dir
 	);
 
