@@ -276,7 +276,7 @@ class TableArchiver {
 			$prev_index_name = $index_name;
 		}
 		
-		if (null === $primary) throw new Exception(sprintf('%s table does not have a primary'), $table_name);
+		if (null === $primary) throw new \Exception(sprintf('%s table does not have a primary'), $table_name);
 		
 		return $table;
 	}
