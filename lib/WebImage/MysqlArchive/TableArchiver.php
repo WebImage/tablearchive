@@ -2,13 +2,13 @@
 
 namespace WebImage\MysqlArchive;
 
-define('ARCHIVE_FLAGS_NOLOG',		0x00000001); // Do not log anything
-define('ARCHIVE_FLAGS_LOG_VERBOSE',	0x00000002); // Logging in more detail
-define('ARCHIVE_FLAGS_LOG_STDOUT',	0x00000004); // Send logged data to STDOUT
-define('ARCHIVE_FLAGS_DELETE_DATA',	0x00000020); // Delete data from table after dumping
 
 class TableArchiver {
 	
+	const FLAG_NOLOG	= 0x00000001; // Do not log anything
+	const FLAG_LOG_VERBOSE	= 0x00000002; // Logging in more detail
+	const FLAG_LOG_STDOUT	= 0x00000004; // Send logged data to STDOUT
+	const FLAG_DELETE_DATA	= 0x00000020; // Delete data from table after dumping
 	protected $host, $port, $user, $pass, $dbName;
 	
 	/** @var resource Database **/
@@ -18,6 +18,7 @@ class TableArchiver {
 	/** @var string The directory to which outfiles are written */
 	protected $outfileDir;
 	protected $flags = 0;
+	protected $sleep = null; // amount of time to sleep between requests
 	/**
 	 * log file pointers
 	 **/
@@ -118,12 +119,15 @@ class TableArchiver {
 		$this->executeSqlNoResult('Exporting columns', $sql);
 		
 		do {
+			if ($i > 0 && null !== $this->sleep) sleep($this->sleep);
+
 			$i ++;
 			$start_ix = $i * $batch_size - $batch_size;
 			// $end_ix = $start_ix + $batch_size - 1;
 			
 			$selectinto = "SELECT %s ".
-	                      "FROM %s FORCE INDEX (PRIMARY) %s ".
+	                      /* "FROM %s FORCE INDEX (PRIMARY) %s ". */
+	                      "FROM %s %s ".
 	                      "LIMIT %d, %d " .
 	                      "INTO OUTFILE '%s.%d'";
 			$columns = $table->getColumnNames();
@@ -145,7 +149,7 @@ class TableArchiver {
 			
 		} while ($row_count >= $batch_size);
 		
-		if ($this->flags & ARCHIVE_FLAGS_DELETE_DATA) {
+		if ($this->flags & self::FLAG_DELETE_DATA) {
 			$sql = "DELETE FROM %s %s";
 			$sql = sprintf($sql, $table_name, $where);
 			$this->executeSqlNoResult(sprintf('Cleaning up table %s', $table_name), $sql);
@@ -157,15 +161,15 @@ class TableArchiver {
 	}
 	
 	protected function logVerbose($txt) {
-		if ($this->flags & ARCHIVE_FLAGS_NOLOG) return;
-		if ($this->flags & ARCHIVE_FLAGS_LOG_VERBOSE) {
+		if ($this->flags & self::FLAG_NOLOG) return;
+		if ($this->flags & self::FLAG_LOG_VERBOSE) {
 			$this->logCompact($txt);
 		}
 	}
 	
 	protected function logCompact($txt) {
 		
-		if ($this->flags & ARCHIVE_FLAGS_NOLOG) return;
+		if ($this->flags & self::FLAG_NOLOG) return;
 		
 		$timestamp = date('Y-m-d G:i:s');
 		
@@ -173,7 +177,7 @@ class TableArchiver {
 		
 		fwrite($this->logFP, $entry);
 		
-		if ($this->flags & ARCHIVE_FLAGS_LOG_STDOUT) echo $entry;
+		if ($this->flags & self::FLAG_LOG_STDOUT) echo $entry;
 		
 	}
 	
@@ -182,7 +186,7 @@ class TableArchiver {
 		fwrite($this->errorFP, $this->getLogHeader());
 		fwrite($this->errorFP, "$txt\n");
 		
-		if ($this->flags & ARCHIVE_FLAGS_LOG_STDOUT) echo "$txt\n";
+		if ($this->flags & self::FLAG_LOG_STDOUT) echo "$txt\n";
 		
 	}
 	
@@ -205,7 +209,7 @@ class TableArchiver {
 	}
 	protected function executeSqlNoResult($desc, $sql) {
 		
-		if ($this->flags & ARCHIVE_FLAGS_LOG_VERBOSE) {
+		if ($this->flags & self::FLAG_LOG_VERBOSE) {
 			$this->logVerbose($desc . "\n" . $sql . ";\n");
 		} else {
 			$this->logCompact($desc);
@@ -276,7 +280,7 @@ class TableArchiver {
 			$prev_index_name = $index_name;
 		}
 		
-		if (null === $primary) throw new \Exception(sprintf('%s table does not have a primary'), $table_name);
+#		if (null === $primary) throw new \Exception(sprintf('%s table does not have a primary', $table_name));
 		
 		return $table;
 	}
@@ -290,6 +294,9 @@ class TableArchiver {
 	             "WHERE table_name ='%s' and table_schema='%s'";
 				 
 		$sql = sprintf($sql, $table, $this->dbName);
+	}
+	public function sleep($seconds) {
+		$this->sleep = $seconds;
 	}
 	public static function quoted($str)
 	{

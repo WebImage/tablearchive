@@ -14,7 +14,11 @@ $required_flags = array(
 $optional_flags = array(
 	'mysql-user' => 'The user account that runs the Mysql server',
 	'where' => 'A SQL WHERE statement to filter results to be archived',
-	'basename' => 'The basename of the file to be exported into the data directory'
+	'basename' => 'The basename of the file to be exported into the data directory',
+	'v' => 'Verbose output',
+	'delete' => 'Delete data from SQL table after dumping',
+	'sleep' => 'Number of seconds to sleep between dump iterations (default=0)',
+	'batchsize' => 'Number of records to process per batch'
 );
 $flags = array_merge($required_flags, $optional_flags);
 $supported_flags = array_keys($flags);
@@ -40,6 +44,10 @@ $log_dir	= $args->getFlag('l'); // Directory where output logs will be stored
 $table		= $args->getFlag('t');
 $mysql_user	= $args->getFlag('mysql-user', 'mysql');
 $where		= $args->getFlag('where', '');
+$opt_delete	= $args->isFlagSet('delete');
+$opt_verbose	= $args->isFlagSet('v');
+$opt_sleep	= $args->getFlag('sleep');
+$opt_batchsize	= $args->getFlag('batchsize');
 
 $host = get_param($config, 'host');
 $port = get_param($config, 'port');
@@ -48,6 +56,10 @@ $pass = get_param($config, 'pass');
 $database = get_param($config, 'database');
 
 // selectTableIntoOutfile
+$archive_flags = 0;
+if ($opt_verbose) $archive_flags = $archive_flags | TableArchiver::FLAG_LOG_STDOUT;
+if ($opt_delete) $archive_flags = $archive_flags | TableArchiver::FLAG_DELETE_DATA;
+
 $archive = new TableArchiver(
 	$host,
 	$port,
@@ -56,12 +68,16 @@ $archive = new TableArchiver(
 	$database,
 	$mysql_user,
 	$data_dir,
-	ARCHIVE_FLAGS_LOG_STDOUT /* | ARCHIVE_FLAGS_DELETE_DATA */,
+	$archive_flags,
 	$log_dir
 	);
+if (null !== $opt_sleep) {
+	if (!is_numeric($opt_sleep)) die('Invalid sleep value');
+	$archive->sleep($opt_sleep);
+}
 
 $outfile_basename = $args->isFlagSet('basename') ? $args->getFlag('basename') : null;
-$archive->archive($table, $where, $outfile_basename);
+$archive->archive($table, $where, $outfile_basename, $opt_batchsize);
 
 function get_help(array $options) {
 	$longest = 0;
